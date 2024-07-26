@@ -1,4 +1,6 @@
 x64/
+!dependencies/**/x64/
+
 build/
 
 .cache/
