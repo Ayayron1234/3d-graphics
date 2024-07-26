@@ -1,0 +1,10 @@
+x64/
+build/
+
+.cache/
+
+.vs/
+*.vcxproj.filters
+*.vcxproj.user
+
+desktop.ini
