@@ -31,7 +31,24 @@ public:
 		void update(const vec3& vertex);
 	};
 
+	struct Face {
+		vec3 vertex1; vec2 uv1; vec3 normal1;
+		vec3 vertex2; vec2 uv2; vec3 normal2;
+		vec3 vertex3; vec2 uv3; vec3 normal3;
+	};
+
+	struct FaceIndices {
+		vec3i v1;
+		vec3i v2;
+		vec3i v3;
+	};
+
 	static std::shared_ptr<Mesh> loadFromObjFile(const std::string& path);
+
+	size_t faceCount() const;
+
+	void constructFaces(const std::vector<vec3>& vertices, const std::vector<vec2>& uvs,
+		const std::vector<vec3>& normals, const std::vector<FaceIndices>& indices);
 
 	void draw(Shader& shader = Shaders::matt) const;
 
@@ -46,27 +63,19 @@ public:
 	~Mesh();
 
 private:
-	struct FaceIndices {
-		vec3i v1;
-		vec3i v2;
-		vec3i v3;
-	};
-
-	struct Face {
-		vec3 vertex1; vec2 uv1; vec3 normal1;
-		vec3 vertex2; vec2 uv2; vec3 normal2;
-		vec3 vertex3; vec2 uv3; vec3 normal3;
-	};
 
 	enum class Status { OK = 0x00, UNLOADED, FILE_NOT_FOUND, FAILED };
-	
-	std::vector<Face>	m_faces;
 
-	Status				m_status = Status::UNLOADED;
+	std::vector<Face>		 m_faces;
 
-	BoundingBox			m_boundingBox;
+	Status					 m_status = Status::UNLOADED;
+
+	BoundingBox				 m_boundingBox;
 
 	class CacheFileHeader;
+
+	Face getFace(const std::vector<vec3>& vertices, const std::vector<vec2>& uvs,
+		const std::vector<vec3>& normals, const std::vector<FaceIndices>& indices, size_t index) const;
 
 	bool tryLoadCache(const std::string& path);
 

@@ -85,10 +85,12 @@ static ShaderSourceWrapperImpl meshWireframeShaderFragmentSource = ShaderSourceW
 
 Shader Mesh::Shaders::wireframe = Shader(meshWireframeShaderVertexSource, meshWireframeShaderFragmentSource);
 
+#define MESH_CACHE_VERSION 3
 class Mesh::CacheFileHeader {
 public:
     using file_time = std::filesystem::file_time_type;
     
+    const unsigned int version = MESH_CACHE_VERSION;
     file_time   lastSaveTime;
     BoundingBox boundingBox;
 };
@@ -131,6 +133,10 @@ public:
         glDrawArrays(GL_TRIANGLES, 0, 3 * faces.size());
     }
 
+    void update() {
+        m_changed = true;
+    }
+
 private:
     inline static GLuint s_vao = 0u;
 
@@ -165,22 +171,31 @@ bool Mesh::tryLoadCache(const std::string& path) {
 
     file_time fileLastModified = std::filesystem::last_write_time(path);
 
+    // Read header
     CacheFileHeader header;
     ifs.read((char*)&header, sizeof(CacheFileHeader));
 
+    // If cache version doesn't match current reload the mesh
+    if (MESH_CACHE_VERSION != header.version)
+        return false;
+
+    // If file changed reload mesh
     if (fileLastModified != header.lastSaveTime)
         return false;
 
     m_boundingBox = header.boundingBox;
 
+    // Read binary file to buffer
     ifs.seekg(0, std::ios::beg);
     std::vector<char> buffer = readBinaryFile(ifs);
     size_t faceCount = (buffer.size() - sizeof(CacheFileHeader)) / sizeof(Face);
 
     ifs.close();
 
+    // Read faces
     m_faces.resize(faceCount);
     memcpy_s(m_faces.data(), faceCount * sizeof(Face), &buffer.data()[sizeof(CacheFileHeader)], faceCount * sizeof(Face));
+
     m_status = Status::OK;
 
     debug::cout << "Loaded mesh from cache: " << cachePath << std::endl;
@@ -248,11 +263,6 @@ std::shared_ptr<Mesh> Mesh::loadFromObjFile(const std::string& path) {
         return mesh;
     }
 
-    std::vector<FaceIndices> tmpFaceIndices;
-    std::vector<vec3> tmpVertices{};
-    std::vector<vec2> tmpUVs{};
-    std::vector<vec3> tmpNormals{};
-
     size_t lineCount = std::count(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>(), '\n');
     ifs.seekg(0, std::ios::beg);
     bool isLargeFile = (lineCount > 500000);
@@ -262,6 +272,11 @@ std::shared_ptr<Mesh> Mesh::loadFromObjFile(const std::string& path) {
             debug::cout << (char)177u;
         debug::cout << "]\b\b\b\b\b\b\b\b\b\b\b";
     }
+
+    std::vector<vec3> tmpVertices{};
+    std::vector<vec2> tmpUVs{};
+    std::vector<vec3> tmpNormals{};
+    std::vector<FaceIndices> tmpIndices{};
 
     size_t i = 0;
     int done = 0;
@@ -305,7 +320,7 @@ std::shared_ptr<Mesh> Mesh::loadFromObjFile(const std::string& path) {
                 { vertexIndex[1] - 1, uvIndex[1] - 1, normalIndex[1] - 1 },
                 { vertexIndex[2] - 1, uvIndex[2] - 1, normalIndex[2] - 1 },
             };
-            tmpFaceIndices.push_back(face);
+            tmpIndices.push_back(face);
         }
         else {
             continue;
@@ -325,14 +340,7 @@ std::shared_ptr<Mesh> Mesh::loadFromObjFile(const std::string& path) {
         }
     }
 
-    for (auto& faceIndices : tmpFaceIndices) {
-        Face face{ 
-            tmpVertices.at(faceIndices.v1.x), tmpUVs.at(faceIndices.v1.y), tmpNormals.at(faceIndices.v1.z),
-            tmpVertices.at(faceIndices.v2.x), tmpUVs.at(faceIndices.v2.y), tmpNormals.at(faceIndices.v2.z),
-            tmpVertices.at(faceIndices.v3.x), tmpUVs.at(faceIndices.v3.y), tmpNormals.at(faceIndices.v3.z),
-        };
-        mesh->m_faces.push_back(face);
-    }
+    mesh->constructFaces(tmpVertices, tmpUVs, tmpNormals, tmpIndices);
 
     if (isLargeFile)
         debug::cout << ((done < 10) ? (char)219u : ' ') << std::endl;
@@ -342,6 +350,31 @@ std::shared_ptr<Mesh> Mesh::loadFromObjFile(const std::string& path) {
         
     mesh->m_status = Status::OK;
     return mesh;
+}
+
+graphics::Mesh::Face graphics::Mesh::getFace(
+    const std::vector<vec3>& vertices, const std::vector<vec2>& uvs,
+    const std::vector<vec3>& normals, const std::vector<FaceIndices>& indices, size_t index) const
+{
+    const FaceIndices& face = indices.at(index);
+    return Face {
+        vertices.at(face.v1.x), uvs.at(face.v1.y), normals.at(face.v1.z),
+        vertices.at(face.v2.x), uvs.at(face.v2.y), normals.at(face.v2.z),
+        vertices.at(face.v3.x), uvs.at(face.v3.y), normals.at(face.v3.z),
+    };
+}
+
+void graphics::Mesh::constructFaces(
+    const std::vector<vec3>& vertices, const std::vector<vec2>& uvs, 
+    const std::vector<vec3>& normals, const std::vector<FaceIndices>& indices)
+{
+    m_faces.clear();
+    m_faces.resize(indices.size());
+
+    for (int i = 0; i < indices.size(); ++i)
+        m_faces.push_back(getFace(vertices, uvs, normals, indices, i));
+    
+    impl->update();
 }
 
 void Mesh::draw(Shader& shader) const {

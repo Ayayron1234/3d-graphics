@@ -31,6 +31,10 @@ void drawTrig(const vec3& v1, const vec3& v2, const vec3& v3,
 void fillTrig(const vec2& v1, const vec2& v2, const vec2& v3,
 	const Color& color = Color::white(), Shader& shader = colorShader);
 
+void fillTrig(
+	const vec3& v1, const vec3& v2, const vec3& v3,
+	const Color& color, Shader& shader = colorShader);
+
 void drawTrig(const vec2& v1, const Color& color1,
 	const vec2& v2, const Color& color2,
 	const vec2& v3, const Color& color3, Shader& shader = colorShader);

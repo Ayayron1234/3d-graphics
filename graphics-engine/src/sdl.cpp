@@ -6,6 +6,7 @@
 #include "keyboard.h"
 #include "sdl.h"
 #include "object.h"
+#include "imgui.h"
 
 using namespace graphics;
 
@@ -49,8 +50,14 @@ public:
 	}
 
 	static void handleEvent(SDL_Event event) {
-		SDL_GetMouseState(&instance().m_mousePos.x, &instance().m_mousePos.y);
 
+	}
+
+	static void updateMouseState() {
+		SDL_GetMouseState(&instance().m_mousePos.x, &instance().m_mousePos.y);
+	}
+
+	static void increaseTickCount() {
 		++instance().m_tickCount;
 	}
 
@@ -104,6 +111,8 @@ struct Window::Impl {
 
 	unsigned long   m_tickCount = 0;
 
+	bool			m_isImGuiInited = false;
+
 	Impl(unsigned width, unsigned height)
 		: m_width(width)
 		, m_height(height)
@@ -111,13 +120,27 @@ struct Window::Impl {
 
 	void beginFrame() {
 		PrimitiveDrawer::beginFrame();
+
+		// Start the Dear ImGui frame
+		if (m_isImGuiInited) {
+			ImGui_ImplOpenGL3_NewFrame();
+			ImGui_ImplSDL2_NewFrame();
+			ImGui::NewFrame();
+			ImGui::DockSpaceOverViewport((const ImGuiViewport*)0, ImGuiDockNodeFlags_PassthruCentralNode);
+		}
 	}
 
 	void endFrame() {
+		PrimitiveDrawer::endFrame();
+
+		// Render ImGui draw data
+		if (m_isImGuiInited) {
+			ImGui::Render();
+			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		}
+
 		++m_tickCount;
 		SDL::keyboardState().update();
-
-		PrimitiveDrawer::endFrame();
 
 		// Swap buffers
 		SDL_GL_SwapWindow(window);
@@ -128,11 +151,12 @@ struct Window::Impl {
 	}
 
 	void handleEvents() {
+		// Update mouse button and scroll state
 		m_prevMouseButtons = m_mouseButtons;
 		SDL::prevMousePosition() = SDL::mousePosition();
-
 		m_mouseScrollAmount = 0;
 
+		// Handle window resize
 		int newWidth, newHeight;
 		SDL_GetWindowSize(window, &newWidth, &newHeight);
 		m_didResize = (newWidth != m_width || newHeight != m_height);
@@ -144,9 +168,15 @@ struct Window::Impl {
 			glViewport(0, 0, m_width, m_height);
 		}
 
+		SDL::updateMouseState();
+		SDL::increaseTickCount();
+
 		SDL_Event event;
 		while (SDL_PollEvent(&event)) {
-			//ImGui_ImplSDL2_ProcessEvent(&event);
+			// Pass event to ImGui
+			if (m_isImGuiInited)
+				ImGui_ImplSDL2_ProcessEvent(&event);
+
 			SDL::handleEvent(event);
 
 			switch (event.type)
@@ -215,7 +245,7 @@ void Window::open() {
 	}
 
 	glViewport(0, 0, impl->m_width, impl->m_height);
-	impl->beginFrame();
+	PrimitiveDrawer::beginFrame();
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -239,6 +269,28 @@ void Window::open() {
 	Object::Shaders::wireframe.bindUniform("VP", debug::camera);
 
 	impl->isOpen = true;
+}
+
+void graphics::Window::initImGui() {
+	ImGui::CreateContext();
+
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+	io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+	ImGui::StyleColorsClassic();
+
+	ImGui_ImplSDL2_InitForOpenGL(impl->window, impl->glContext);
+	ImGui_ImplOpenGL3_Init("#version 330");
+
+	impl->m_isImGuiInited = true;
+
+	// Begin first imgui frame
+	ImGui_ImplOpenGL3_NewFrame();
+	ImGui_ImplSDL2_NewFrame();
+	ImGui::NewFrame();
+	ImGui::DockSpaceOverViewport((const ImGuiViewport*)0, ImGuiDockNodeFlags_PassthruCentralNode);
 }
 
 void Window::close() {

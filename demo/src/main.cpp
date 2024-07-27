@@ -6,6 +6,7 @@
 #include "mesh.h"
 #include "keyboard.h"
 #include "object.h"
+#include "imgui.h"
 
 #include <iostream>
 #include <filesystem>
@@ -93,9 +94,15 @@ void hitObjects(const Ray& ray, const std::vector<Object*>& objects, std::vector
 		hits.push_back(Ray{ nearest.position, nearest.normal });
 }
 
+/*
+ *	TODO: 
+ *		- imgui integration
+ */
+
 int main(void) {
 	Window window("3d-graphics", 1280, 800);
 	window.open();
+	window.initImGui();
 
 	auto earthTexture = Texture::loadFromFile("data/earth.bmp");
 	auto wallTexture = Texture::loadFromFile("data/wall.bmp");
@@ -146,7 +153,7 @@ int main(void) {
 		cube.drawBoundingBox();
 		sphere.draw();
 		sphere.drawWireframe();
-		//plane.draw(Object::Shaders::matt);
+		plane.draw(Object::Shaders::matt);
 		house.draw(Object::Shaders::matt);
 
 		cube.tilt(0.f, 0.004f);
@@ -195,6 +202,8 @@ int main(void) {
 		debug::drawLine(camController.getTarget(), camController.getTarget() + vec3(.1f, 0, 0) * camController.getZoom(), Color::red());
 		debug::drawLine(camController.getTarget(), camController.getTarget() + vec3(0, .1f, 0) * camController.getZoom(), Color::green());
 		debug::drawLine(camController.getTarget(), camController.getTarget() + vec3(0, 0, .1f) * camController.getZoom(), Color::lightBlue());
+
+		ImGui::ShowDemoWindow();
 
 		window.render();
 	}

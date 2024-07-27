@@ -17,6 +17,8 @@ public:
 	Window(const std::string& title, unsigned width, unsigned height);
 
 	void open();
+
+	void initImGui();
 	
 	void close();
 

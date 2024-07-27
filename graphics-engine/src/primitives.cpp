@@ -75,6 +75,14 @@ void debug::fillTrig(
 	PrimitiveDrawer::fillTrig(v1, color, v2, color, v3, color);
 }
 
+void debug::fillTrig(
+	const vec3& v1, const vec3& v2, const vec3& v3,
+	const Color& color, Shader& shader)
+{
+	PrimitiveDrawer::useShader(shader);
+	PrimitiveDrawer::fillTrig(v1, color, v2, color, v3, color);
+}
+
 void debug::drawTrig(
 	const vec2& v1, const Color& color1, 
 	const vec2& v2, const Color& color2, 

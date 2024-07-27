@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{28d85784-5d08-4fcc-a952-7980dfe5d6d4}</ProjectGuid>
-    <RootNamespace>graphicsengine</RootNamespace>
+    <ProjectGuid>{2ab06833-3f2d-45c5-a846-8bbab2ba34ea}</ProjectGuid>
+    <RootNamespace>imgui</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -71,10 +71,10 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)build\lib\$(Configuration)\</OutDir>
+    <OutDir>$(ProjectDir)build\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)build\lib\$(Configuration)\</OutDir>
+    <OutDir>$(ProjectDir)build\$(Configuration)\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -111,21 +111,15 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <AdditionalIncludeDirectories>$(SolutionDir)dependencies\include;$(ProjectDir)include;$(ProjectDir)src;$(SolutionDir)imgui\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(ProjectDir)include\imgui\;$(SolutionDir)dependencies\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
-    <Lib>
-      <AdditionalDependencies>SDL2.lib;SDL2main.lib;glew32.lib;OpenGL32.lib;Glu32.lib;imgui.lib</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)dependencies\SDL2\lib\$(Platform);$(SolutionDir)dependencies\glew\lib\$(Platform);$(SolutionDir)imgui\build\$(Configuration)</AdditionalLibraryDirectories>
-    </Lib>
     <PostBuildEvent>
-      <Command>xcopy /y /s /i "$(ProjectDir)include\*" "$(OutDir)..\..\"
+      <Command>xcopy /y /s /i "$(ProjectDir)include\*" "$(SolutionDir)build\"
 </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -138,10 +132,8 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <AdditionalIncludeDirectories>$(SolutionDir)dependencies\include;$(ProjectDir)include;$(ProjectDir)src;$(SolutionDir)imgui\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(ProjectDir)include\imgui\;$(SolutionDir)dependencies\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -149,58 +141,34 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
-    <Lib>
-      <AdditionalDependencies>SDL2.lib;SDL2main.lib;glew32.lib;OpenGL32.lib;Glu32.lib;imgui.lib</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)dependencies\SDL2\lib\$(Platform);$(SolutionDir)dependencies\glew\lib\$(Platform);$(SolutionDir)imgui\build\$(Configuration)</AdditionalLibraryDirectories>
-    </Lib>
     <PostBuildEvent>
-      <Command>xcopy /y /s /i "$(ProjectDir)include\*" "$(OutDir)..\..\"
+      <Command>xcopy /y /s /i "$(ProjectDir)include\*" "$(SolutionDir)build\"
 </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="include\bitmap.h" />
-    <ClInclude Include="include\camera.h" />
-    <ClInclude Include="include\imgui.h" />
     <ClInclude Include="include\imgui\backends\imgui_impl_opengl3.h" />
     <ClInclude Include="include\imgui\backends\imgui_impl_opengl3_loader.h" />
     <ClInclude Include="include\imgui\backends\imgui_impl_sdl2.h" />
-    <ClInclude Include="include\imgui\backends\imgui_impl_sdlrenderer2.h" />
     <ClInclude Include="include\imgui\imconfig.h" />
     <ClInclude Include="include\imgui\imgui.h" />
     <ClInclude Include="include\imgui\imgui_impl_sdl2.h" />
-    <ClInclude Include="include\imgui\imgui_impl_sdlrenderer2.h" />
     <ClInclude Include="include\imgui\imgui_internal.h" />
     <ClInclude Include="include\imgui\imgui_stdlib.h" />
     <ClInclude Include="include\imgui\imstb_rectpack.h" />
     <ClInclude Include="include\imgui\imstb_textedit.h" />
     <ClInclude Include="include\imgui\imstb_truetype.h" />
-    <ClInclude Include="include\keyboard.h" />
-    <ClInclude Include="include\mesh.h" />
-    <ClInclude Include="include\object.h" />
-    <ClInclude Include="include\debug.h" />
-    <ClInclude Include="include\shader.h" />
-    <ClInclude Include="include\texture.h" />
-    <ClInclude Include="include\primitives.h" />
-    <ClInclude Include="src\graphics_headers.h" />
-    <ClInclude Include="src\pch.h" />
-    <ClInclude Include="include\window.h" />
-    <ClInclude Include="src\primitive_drawer.h" />
-    <ClInclude Include="src\sdl.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\object.cpp" />
-    <ClCompile Include="src\mesh.cpp" />
-    <ClCompile Include="src\camera.cpp" />
-    <ClCompile Include="src\bitmap.cpp" />
-    <ClCompile Include="src\pch.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="src\primitives.cpp" />
-    <ClCompile Include="src\sdl.cpp" />
-    <ClCompile Include="src\shader.cpp" />
-    <ClCompile Include="src\texture.cpp" />
+    <ClCompile Include="src\backends\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="src\backends\imgui_impl_sdl2.cpp" />
+    <ClCompile Include="src\imgui.cpp" />
+    <ClCompile Include="src\imgui_demo.cpp" />
+    <ClCompile Include="src\imgui_draw.cpp" />
+    <ClCompile Include="src\imgui_impl_sdl2.cpp" />
+    <ClCompile Include="src\imgui_stdlib.cpp" />
+    <ClCompile Include="src\imgui_tables.cpp" />
+    <ClCompile Include="src\imgui_widgets.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
