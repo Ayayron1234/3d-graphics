@@ -3,6 +3,7 @@
 #include "pch.h"
 #else
 #include <memory>
+#include <string>
 #endif // GRAPHICS_PCH
 
 namespace graphics {
@@ -27,15 +28,24 @@ public:
 		return m_empty;
 	}
 
-	static std::shared_ptr<Texture> loadFromFile(const std::string& path, MagFilter minFilter = LINEAR, MagFilter magFilter = LINEAR);
+	// allocates memory on the gpu
+	void resize(unsigned width, unsigned height);
+
+	static Texture loadFromFile(const std::string& path, MagFilter minFilter = LINEAR, MagFilter magFilter = LINEAR);
+
+	static Texture createTexture(unsigned width, unsigned height, MagFilter minFilter = LINEAR, MagFilter magFilter = LINEAR);
+
+	static Texture null();
 
 private:
 	class ID;
 	
 	std::shared_ptr<ID> m_id;
 
-	unsigned			m_width;
-	unsigned			m_height;
+	Texture(unsigned id);
+
+	unsigned			m_width = 0;
+	unsigned			m_height = 0;
 	bool				m_empty = true;
 };
 

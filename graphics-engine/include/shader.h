@@ -58,6 +58,8 @@ public:
 
 	static unsigned int currentID();
 
+	static Shader loadFromTextFiles(const char* vertexSourcePath, const char* fragmentSourcePath, const char* geometrySourcePath = nullptr);
+
 	~Shader();
 
 private:
@@ -86,7 +88,8 @@ private:
 	template <typename T>
 	class DynamicUniformSource;
 
-	std::unordered_map<std::string, std::unique_ptr<IUniformSource>> m_uniforms;
+	std::shared_ptr<std::unordered_map<std::string, std::unique_ptr<IUniformSource>>> m_uniforms 
+		= std::make_shared<std::unordered_map<std::string, std::unique_ptr<IUniformSource>>>();
 
 	Shader();
 

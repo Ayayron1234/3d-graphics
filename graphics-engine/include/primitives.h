@@ -10,6 +10,10 @@
 	return vec2(x operation v.x, y operation v.y);\
 }
 
+#define _VEC2I_OPERATION(operation) vec2i operator##operation##(const vec2i& v) const {\
+	return vec2(x operation v.x, y operation v.y);\
+}
+
 namespace graphics {
 
 struct vec2 {
@@ -34,9 +38,49 @@ struct vec2 {
 	vec2 operator/(float s) const {
 		return vec2(x / s, y / s);
 	}
+
+	bool operator<(const vec2& v) const {
+		return length() < v.length();
+	}
+
+	bool operator==(const vec2& v) const {
+		return x == v.x && y == v.y;
+	}
+
+	float length() const {
+		return sqrtf(x * x + y * y);
+	}
 };
 
 }
+
+inline std::ostream& operator<<(std::ostream& os, const graphics::vec2& v) {
+	os << "{" << v.x << "," << v.y << "}";
+	return os;
+}
+
+inline graphics::vec2 normalize(const graphics::vec2& v) {
+	auto res = v / v.length();
+	return res;
+}
+
+inline float cross(const graphics::vec2& a, const graphics::vec2& b) {
+	return a.x * b.y - a.y * b.x;
+}
+
+inline float dot(const graphics::vec2& a, const graphics::vec2& b) {
+	return a.x * b.x + a.y * b.y;
+}
+
+template <>
+struct std::hash<graphics::vec2>
+{
+	std::size_t operator()(const graphics::vec2& v) const {
+		std::size_t h1 = std::hash<int>{}(v.x);
+		std::size_t h2 = std::hash<int>{}(v.y);
+		return h1 ^ (h2 << 1);  // Combine the two hash values
+	}
+};
 
 namespace graphics {
 
@@ -102,6 +146,10 @@ struct vec3 {
 
 	float length() const {
 		return sqrtf(x * x + y * y + z * z);
+	}
+
+	vec2 xz() const {
+		return vec2(x, z);
 	}
 };
 
@@ -304,6 +352,15 @@ inline graphics::mat4 operator*(const graphics::mat4& ml, const graphics::mat4& 
 
 namespace graphics {
 
+struct BoundingBox {
+	vec3 min = vec3((unsigned)-1, (unsigned)-1, (unsigned)-1);
+	vec3 max = vec3(-min.x, -min.x, -min.x);
+
+	void getVertices(vec3 vertices[8]) const;
+
+	void update(const vec3& vertex);
+};
+
 struct Color {
 	unsigned char r = 0, g = 0, b = 0, a = 255;
 
@@ -348,6 +405,30 @@ struct Color::FColor {
 	{ }
 };
 
+struct Trig {
+	vec2 v0;
+	vec2 v1;
+	vec2 v2;
+
+	float sign() const {
+		return (v0.x - v2.x) * (v1.y - v2.y) - (v1.x - v2.x) * (v0.y - v2.y);
+	}
+
+	bool isPointInside(const vec2& p) const {
+		float d1, d2, d3;
+		bool has_neg, has_pos;
+
+		d1 = Trig(p, v0, v1).sign();
+		d2 = Trig(p, v1, v2).sign();
+		d3 = Trig(p, v2, v0).sign();
+
+		has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+		has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+
+		return !(has_neg && has_pos);
+	}
+};
+
 struct Ray {
 	vec3 origin;
 	vec3 direction;
@@ -359,6 +440,10 @@ struct Ray {
 
 		static Hit noHit() {
 			return { vec3(), vec3(), std::numeric_limits<float>::infinity() };
+		}
+
+		bool didHit() const {
+			return t > 0 && t != std::numeric_limits<float>::infinity();
 		}
 	};
 
@@ -398,6 +483,79 @@ struct Ray {
 
 		return Hit{ p, normalize(trigNormal), t };
 	}
+
+	Hit intersectAABB(const vec3& min, const vec3& max, bool inverted = false) const {
+		Hit hit;
+		bool inside = isPointInsideAABB(origin, min, max);
+
+		if (!inverted && inside) return hit;
+
+		vec3 invDir = { 1 / direction.x, 1 / direction.y, 1 / direction.z };
+
+		vec3 tNear = (min - origin) * invDir;
+		vec3 tFar = (max - origin) * invDir;
+
+		vec3 tmp = { std::min(tNear.x, tFar.x), std::min(tNear.y, tFar.y), std::min(tNear.z, tFar.z) };
+		tFar = { std::max(tNear.x, tFar.x), std::max(tNear.y, tFar.y), std::max(tNear.z, tFar.z) };
+		tNear = tmp;
+
+		if (tNear.x > tFar.y || tNear.x > tFar.z ||
+			tNear.y > tFar.z || tNear.y > tFar.x ||
+			tNear.z > tFar.x || tNear.z > tFar.y)
+			return hit;
+
+		if (!inside && !inverted) {
+			if (tNear.x <= 0 && tNear.y <= 0 && tNear.z <= 0) return hit;
+		}
+		else if (tFar.x <= 0 && tFar.y <= 0 && tFar.z <= 0)
+			return hit;
+
+		float tHit = (inside || inverted) ? std::min(tFar.x, std::min(tFar.y, tFar.z)) : std::max(tNear.x, std::max(tNear.y, tNear.z));
+
+		hit.position = origin + tHit * direction;
+		if (!inside && !inverted) {
+			if (tNear.x > tNear.y && tNear.x > tNear.z) {
+				hit.normal = (invDir.x < 0) ? vec3{ 1, 0, 0 } : vec3{ -1, 0, 0 };
+				hit.t = tNear.x;
+			}
+			else if (tNear.y > tNear.x && tNear.y > tNear.z) {
+				hit.normal = (invDir.y < 0) ? vec3{ 0, 1, 0 } : vec3{ 0, -1, 0 };
+				hit.t = tNear.y;
+			}
+			else if (tNear.z > tNear.x && tNear.z > tNear.y) {
+				hit.normal = (invDir.z < 0) ? vec3{ 0, 0, 1 } : vec3{ 0, 0, -1 };
+				hit.t = tNear.z;
+			}
+		}
+		else {
+			if (tFar.x < tFar.y && tFar.x < tFar.z) {
+				hit.normal = (invDir.x < 0) ? vec3{ 1, 0, 0 } : vec3{ -1, 0, 0 };
+				hit.t = tFar.x;
+			}
+			else if (tFar.y < tFar.x && tFar.y < tFar.z) {
+				hit.normal = (invDir.y < 0) ? vec3{ 0, 1, 0 } : vec3{ 0, -1, 0 };
+				hit.t = tFar.y;
+			}
+			else if (tFar.z < tFar.x && tFar.z < tFar.y) {
+				hit.normal = (invDir.z < 0) ? vec3{ 0, 0, 1 } : vec3{ 0, 0, -1 };
+				hit.t = tFar.z;
+			}
+		}
+
+		return hit;
+	}
+
+private:
+	bool isPointInsideAABB(const vec3& point, const vec3& min, const vec3& max) const {
+		if (point.x > min.x && point.x < max.x &&
+			point.y > min.y && point.y < max.y &&
+			point.z > min.z && point.z < max.z)
+		{
+			return true;
+		}
+		return false;
+	}
+
 };
 
 }

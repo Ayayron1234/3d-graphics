@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -177,11 +177,13 @@
     <ClInclude Include="include\imgui\imstb_truetype.h" />
     <ClInclude Include="include\keyboard.h" />
     <ClInclude Include="include\mesh.h" />
+    <ClInclude Include="include\mouse.h" />
     <ClInclude Include="include\object.h" />
     <ClInclude Include="include\debug.h" />
     <ClInclude Include="include\shader.h" />
     <ClInclude Include="include\texture.h" />
     <ClInclude Include="include\primitives.h" />
+    <ClInclude Include="include\viewport.h" />
     <ClInclude Include="src\graphics_headers.h" />
     <ClInclude Include="src\pch.h" />
     <ClInclude Include="include\window.h" />
@@ -189,6 +191,11 @@
     <ClInclude Include="src\sdl.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\framebuffer.h" />
+    <ClCompile Include="src\viewport.cpp" />
+    <ClCompile Include="src\render_target.cpp" />
+    <ClInclude Include="include\render_target.h" />
+    <ClCompile Include="src\framebuffer.cpp" />
     <ClCompile Include="src\object.cpp" />
     <ClCompile Include="src\mesh.cpp" />
     <ClCompile Include="src\camera.cpp" />

@@ -25,6 +25,8 @@ public:
 
 	void setAspectRatio(const Window& window);
 
+	void setAspectRatio(const Viewport& viewport);
+
 	void setFoV(float fov);
 
 	void setFoVDeg(float fov);

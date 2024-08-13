@@ -4,9 +4,15 @@
 #include "graphics_headers.h"
 #include "camera.h"
 #include "keyboard.h"
+#include "mouse.h"
 #include "sdl.h"
 #include "object.h"
 #include "imgui.h"
+#include "viewport.h"
+
+#pragma comment (lib, "Dwmapi")
+#include <dwmapi.h>
+#include "SDL2/SDL_syswm.h"
 
 using namespace graphics;
 
@@ -32,10 +38,24 @@ struct KeyboardState {
 
 class SDL {
 public:
-	static void init() {
-		if (instance().m_inited)
-			return;
+	vec2i			mousePos;
+	vec2i			prevMousePos;
+	vec2i			mouseWindowPos;
+	vec2i			prevMouseWindowPos;
 
+	Uint8			mouseButtons = 0;
+	Uint8			prevMouseButtons = 0;
+
+	float			mouseScrollAmount = 0;
+
+	KeyboardState	keyboardState{};
+
+	static SDL& instance() {
+		static SDL c_instance;
+		return c_instance;
+	}
+
+	SDL() {
 		// Init SDL
 		SDL_Init(SDL_INIT_EVERYTHING);
 
@@ -44,33 +64,39 @@ public:
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
-		instance().m_keyboardState.init();
-
-		instance().m_inited = true;
+		keyboardState.init();
 	}
 
-	static void handleEvent(SDL_Event event) {
+	void updateState() {
+		// Update mouse button and scroll state
+		prevMouseButtons = mouseButtons;
+		prevMousePos = mousePos;
+		prevMouseWindowPos = mouseWindowPos;
+		mouseScrollAmount = 0;
 
+		SDL_GetGlobalMouseState(&mousePos.x, &mousePos.y);
+		SDL_GetMouseState(&mouseWindowPos.x, &mouseWindowPos.y);
 	}
 
-	static void updateMouseState() {
-		SDL_GetMouseState(&instance().m_mousePos.x, &instance().m_mousePos.y);
+	void handleEvent(SDL_Event event) {
+		switch (event.type)
+		{
+		case SDL_MOUSEBUTTONDOWN: {
+			mouseButtons |= (1u << event.button.button);
+		} break;
+		case SDL_MOUSEBUTTONUP: {
+			mouseButtons &= ~(1u << event.button.button);
+		} break;
+		case SDL_MOUSEWHEEL:
+			mouseScrollAmount = event.wheel.preciseY;
+			break;
+		default:
+			break;
+		}
 	}
 
 	static void increaseTickCount() {
 		++instance().m_tickCount;
-	}
-
-	static vec2i& mousePosition() {
-		return instance().m_mousePos;
-	}
-
-	static vec2i& prevMousePosition() {
-		return instance().m_prevMousePos;
-	}
-
-	static KeyboardState& keyboardState() {
-		return instance().m_keyboardState;
 	}
 
 	static unsigned long getTicks() {
@@ -78,19 +104,7 @@ public:
 	}
 
 private:
-	bool m_inited = false;
-
-	vec2i m_mousePos;
-	vec2i m_prevMousePos;
-
-	KeyboardState	m_keyboardState{};
-
 	unsigned long	m_tickCount = 0;
-
-	static SDL& instance() {
-		static SDL c_instance;
-		return c_instance;
-	}
 };
 
 struct Window::Impl {
@@ -101,10 +115,6 @@ struct Window::Impl {
 
 	Uint32			m_windowID;
 
-	Uint8			m_mouseButtons = 0;
-	Uint8			m_prevMouseButtons = 0;
-	float			m_mouseScrollAmount = 0;
-
 	unsigned		m_width;
 	unsigned		m_height;
 	bool			m_didResize = false;
@@ -113,9 +123,14 @@ struct Window::Impl {
 
 	bool			m_isImGuiInited = false;
 
+	HWND			m_windowsWindowHandle;
+
+	Viewport		m_viewport;
+
 	Impl(unsigned width, unsigned height)
 		: m_width(width)
 		, m_height(height)
+		, m_viewport(FrameBuffer::backbuffer())
 	{ }
 
 	void beginFrame() {
@@ -137,10 +152,12 @@ struct Window::Impl {
 		if (m_isImGuiInited) {
 			ImGui::Render();
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+			ImGui::EndFrame();
 		}
 
 		++m_tickCount;
-		SDL::keyboardState().update();
+		SDL::instance().keyboardState.update();
+		SDL::instance().keyboardState.setMod(SDL_GetModState());
 
 		// Swap buffers
 		SDL_GL_SwapWindow(window);
@@ -151,11 +168,6 @@ struct Window::Impl {
 	}
 
 	void handleEvents() {
-		// Update mouse button and scroll state
-		m_prevMouseButtons = m_mouseButtons;
-		SDL::prevMousePosition() = SDL::mousePosition();
-		m_mouseScrollAmount = 0;
-
 		// Handle window resize
 		int newWidth, newHeight;
 		SDL_GetWindowSize(window, &newWidth, &newHeight);
@@ -166,9 +178,10 @@ struct Window::Impl {
 			
 			debug::camera->setAspectRatio(m_width, m_height);
 			glViewport(0, 0, m_width, m_height);
+			m_viewport.resize(m_width, m_height);
 		}
 
-		SDL::updateMouseState();
+		SDL::instance().updateState();
 		SDL::increaseTickCount();
 
 		SDL_Event event;
@@ -177,27 +190,15 @@ struct Window::Impl {
 			if (m_isImGuiInited)
 				ImGui_ImplSDL2_ProcessEvent(&event);
 
-			SDL::handleEvent(event);
+			SDL::instance().handleEvent(event);
 
 			switch (event.type)
 			{
 			case SDL_QUIT: {
 				shouldQuit = true;
 			} break;
-			case SDL_MOUSEBUTTONDOWN: {
-				if (m_windowID == event.button.windowID)
-					m_mouseButtons |= (1u << event.button.button);
-				SDL::keyboardState().setMod(SDL_GetModState());
-			} break;
-			case SDL_MOUSEBUTTONUP: {
-				if (m_windowID == event.button.windowID)
-					m_mouseButtons &= ~(1u << event.button.button);
-				SDL::keyboardState().setMod(SDL_GetModState());
-			} break;
-			case SDL_MOUSEWHEEL:
-				if (m_windowID == event.button.windowID)
-					m_mouseScrollAmount = event.wheel.preciseY;
-				break;
+			case SDL_KEYDOWN: {
+			}
 			default:
 				break;
 			}
@@ -212,7 +213,7 @@ Window::Window(const std::string& title, unsigned width, unsigned height)
 
 void Window::open() {
 	// Init SDL and openGL
-	SDL::init();
+	SDL::instance();
 
 	// Create window
 	impl->window = SDL_CreateWindow(m_title.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
@@ -260,15 +261,22 @@ void Window::open() {
 	debug::camera->setAspectRatio(impl->m_width, impl->m_height);
 	debug::cout.rdbuf(std::cout.rdbuf());
 
-	Mesh::Shaders::matt.bindUniform("VP", debug::camera);
-	Mesh::Shaders::wireframe.bindUniform("VP", debug::camera);
+	//Mesh::Shaders::matt.bindUniform("VP", debug::camera);
+	//Mesh::Shaders::wireframe.bindUniform("VP", debug::camera);
 
-	Object::Shaders::matt.bindUniform("VP", debug::camera);
-	Object::Shaders::normal.bindUniform("VP", debug::camera);
-	Object::Shaders::textured.bindUniform("VP", debug::camera);
-	Object::Shaders::wireframe.bindUniform("VP", debug::camera);
+	//Object::Shaders::matt.bindUniform("VP", debug::camera);
+	//Object::Shaders::normal.bindUniform("VP", debug::camera);
+	//Object::Shaders::textured.bindUniform("VP", debug::camera);
+	//Object::Shaders::wireframe.bindUniform("VP", debug::camera);
+
+	// Get window handle
+	SDL_SysWMinfo wmInfo;
+	SDL_VERSION(&wmInfo.version);
+	SDL_GetWindowWMInfo(impl->window, &wmInfo);
+	impl->m_windowsWindowHandle = wmInfo.info.win.window;
 
 	impl->isOpen = true;
+	impl->m_viewport.resize(impl->m_width, impl->m_height);
 }
 
 void graphics::Window::initImGui() {
@@ -276,7 +284,7 @@ void graphics::Window::initImGui() {
 
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-	io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+	//io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
 	ImGui::StyleColorsClassic();
@@ -290,7 +298,7 @@ void graphics::Window::initImGui() {
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui_ImplSDL2_NewFrame();
 	ImGui::NewFrame();
-	ImGui::DockSpaceOverViewport((const ImGuiViewport*)0, ImGuiDockNodeFlags_PassthruCentralNode);
+	ImGui::DockSpaceOverViewport((const ImGuiViewport*)0, ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_AutoHideTabBar);
 }
 
 void Window::close() {
@@ -326,61 +334,136 @@ vec2 transformToNds(vec2i v, unsigned width, unsigned height) {
 	return vec2(2.f * v.x / (float)width - 1.f, 1.f - 2.f * v.y / (float)height);
 }
 
-vec2 graphics::Window::getMousePosition() const {
-	return transformToNds(SDL::mousePosition(), impl->m_width, impl->m_height);
+//vec2 graphics::Window::getMousePosition() const {
+//	return transformToNds(SDL::mousePosition(), impl->m_width, impl->m_height);
+//}
+
+vec2i graphics::Mouse::globalPosition() {
+	return SDL::instance().mousePos;
 }
 
-vec2 graphics::Window::getMouseMotion() const {
-	return SDL::mousePosition() - SDL::prevMousePosition();
+vec2i graphics::Mouse::windowPosition() {
+	return SDL::instance().mouseWindowPos;
 }
 
-vec2 graphics::Window::getMouseMotionNds() const {
-	return transformToNds(SDL::mousePosition(), impl->m_width, impl->m_height) 
-		- transformToNds(SDL::prevMousePosition(), impl->m_width, impl->m_height);
+bool graphics::Mouse::isButtonDown(Button button) {
+	unsigned char _button = (unsigned char)button;
+	_button = (1u << _button);
+	
+	return (SDL::instance().mouseButtons & _button) == _button;
 }
 
-bool graphics::Window::mouseMoved() const {
-	return SDL::mousePosition() != SDL::prevMousePosition();
+bool graphics::Mouse::clicked(Button button) {
+	unsigned char _button = (unsigned char)button;
+	_button = (1u << _button);
+	
+	return ((SDL::instance().mouseButtons & _button) == _button) && !((SDL::instance().prevMouseButtons & _button) == _button);
 }
 
-bool graphics::Window::mouseClicked(MouseButton button) const {
+bool graphics::Mouse::released(Button button) {
 	unsigned char _button = (unsigned char)button;
 	_button = (1u << _button);
 
-	return ((impl->m_mouseButtons & _button) == _button) && !((impl->m_prevMouseButtons & _button) == _button);
+	return (!((SDL::instance().mouseButtons & _button) == _button)) && ((SDL::instance().prevMouseButtons & _button) == _button);
 }
 
-bool Window::isMouseButtonDown(MouseButton button) const {
-	unsigned char _button = (unsigned char)button;
-	_button = (1u << _button);
-
-	return (impl->m_mouseButtons & _button) == _button;
+vec2i graphics::Mouse::motion() {
+	return SDL::instance().mousePos - SDL::instance().prevMousePos;
 }
 
-float graphics::Window::getMouseWheel() const {
-	return impl->m_mouseScrollAmount;
+bool graphics::Mouse::didMove() {
+	return SDL::instance().mousePos != SDL::instance().prevMousePos;
+}
+
+float graphics::Mouse::wheel() {
+	return SDL::instance().mouseScrollAmount;
+}
+
+void graphics::Mouse::setPosition(const vec2i& position) {
+	SDL_WarpMouseGlobal(position.x, position.y);
+}
+
+//
+//vec2 graphics::Window::getMouseMotion() const {
+//	return SDL::mousePosition() - SDL::prevMousePosition();
+//}
+//
+//vec2 graphics::Window::getMouseMotionNds() const {
+//	return transformToNds(SDL::mousePosition(), impl->m_width, impl->m_height) 
+//		- transformToNds(SDL::prevMousePosition(), impl->m_width, impl->m_height);
+//}
+//
+//bool graphics::Window::mouseMoved() const {
+//	return SDL::mousePosition() != SDL::prevMousePosition();
+//}
+//
+//bool graphics::Window::mouseClicked(MouseButton button) const {
+//	unsigned char _button = (unsigned char)button;
+//	_button = (1u << _button);
+//
+//	return ((impl->m_mouseButtons & _button) == _button) && !((impl->m_prevMouseButtons & _button) == _button);
+//}
+//
+//bool Window::isMouseButtonDown(MouseButton button) const {
+//	unsigned char _button = (unsigned char)button;
+//	_button = (1u << _button);
+//
+//	return (impl->m_mouseButtons & _button) == _button;
+//}
+//
+//float graphics::Window::getMouseWheel() const {
+//	return impl->m_mouseScrollAmount;
+//}
+//
+//void graphics::Window::setBackfaceCulling(bool isEnabled) const {
+//	if (isEnabled)
+//		glEnable(GL_CULL_FACE);
+//	else
+//		glDisable(GL_CULL_FACE);
+//}
+
+Viewport& graphics::Window::viewport() {
+	return impl->m_viewport;
+}
+
+void graphics::Window::setBorder(bool isEnabled) const {
+	SDL_SetWindowBordered(impl->window, SDL_bool(isEnabled));
+}
+
+void graphics::Window::setTittlebarTheme(TittlebarTheme theme) {
+	BOOL USE_DARK_MODE = (bool)theme;
+	BOOL SET_IMMERSIVE_DARK_MODE_SUCCESS = SUCCEEDED(DwmSetWindowAttribute(
+		impl->m_windowsWindowHandle, DWMWINDOWATTRIBUTE::DWMWA_USE_IMMERSIVE_DARK_MODE,
+		&USE_DARK_MODE, sizeof(USE_DARK_MODE)));
+
+	ShowWindow(impl->m_windowsWindowHandle, SW_MINIMIZE);
+	ShowWindow(impl->m_windowsWindowHandle, SW_RESTORE);
 }
 
 Window::~Window() { }
 
 bool graphics::isKeyDown(Key key) {
-	return SDL::keyboardState().data[(uint8_t)key];
+	return SDL::instance().keyboardState.data[(uint8_t)key];
 }
 
 bool graphics::isKeyUp(Key key) {
-	return !SDL::keyboardState().data[(uint8_t)key];
+	return !SDL::instance().keyboardState.data[(uint8_t)key];
 }
 
 bool graphics::keyPressed(Key key) {
-	return SDL::keyboardState().data[(uint8_t)key] && !SDL::keyboardState().prevData[(uint8_t)key];
+	return SDL::instance().keyboardState.data[(uint8_t)key] && !SDL::instance().keyboardState.prevData[(uint8_t)key];
 }
 
 bool graphics::keyReleased(Key key) {
-	return !SDL::keyboardState().data[(uint8_t)key] && SDL::keyboardState().prevData[(uint8_t)key];
+	return !SDL::instance().keyboardState.data[(uint8_t)key] && SDL::instance().keyboardState.prevData[(uint8_t)key];
 }
 
 bool graphics::isModPressed(KeyMod mod) {
-	return (SDL::keyboardState().mod & (uint8_t)mod);
+	return (SDL::instance().keyboardState.mod & (uint8_t)mod);
+}
+
+uint8_t graphics::getMods() {
+	return SDL::instance().keyboardState.mod;
 }
 
 unsigned long graphics::getTicks() {

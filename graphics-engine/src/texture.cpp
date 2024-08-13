@@ -12,8 +12,13 @@ public:
 		glGenTextures(1, &m_id);
 	}
 
+    ID(unsigned id)
+        : m_id(id)
+    { }
+
 	~ID() {
-		glDeleteTextures(1, &m_id);
+        if (m_id != 0)
+		    glDeleteTextures(1, &m_id);
 	}
 
 	operator unsigned int() const {
@@ -32,8 +37,18 @@ unsigned int Texture::id() const {
 	return *m_id;
 }
 
-std::shared_ptr<Texture> Texture::loadFromFile(const std::string& path, MagFilter minFilter, MagFilter magFilter) {
-    std::shared_ptr<Texture> texture = std::make_shared<Texture>();
+void Texture::resize(unsigned width, unsigned height) {
+    glBindTexture(GL_TEXTURE_2D, *m_id);
+    
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    m_width = width;
+    m_height = height;
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+Texture Texture::loadFromFile(const std::string& path, MagFilter minFilter, MagFilter magFilter) {
+    Texture texture;
 
     // Load from file
     Bitmap bitmap(path);
@@ -44,11 +59,11 @@ std::shared_ptr<Texture> Texture::loadFromFile(const std::string& path, MagFilte
     }
 
     std::shared_ptr<Color[]> buffer = bitmap.getPixelBuffer<Color>(Bitmap::RGBA);
-    texture->m_width = bitmap.width();
-    texture->m_height = bitmap.height();
+    texture.m_width = bitmap.width();
+    texture.m_height = bitmap.height();
 
-    // Create a OpenGL texture identifier
-    glBindTexture(GL_TEXTURE_2D, texture->id());
+    // Bind texture
+    glBindTexture(GL_TEXTURE_2D, texture.id());
 
     // Setup filtering parameters for display
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter);
@@ -60,6 +75,31 @@ std::shared_ptr<Texture> Texture::loadFromFile(const std::string& path, MagFilte
 #endif
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, bitmap.width(), bitmap.height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, (unsigned char*)buffer.get());
 
-    texture->m_empty = false;
+    texture.m_empty = false;
     return texture;
 }
+
+Texture Texture::createTexture(unsigned width, unsigned height, MagFilter minFilter, MagFilter magFilter) {
+    Texture texture;
+
+    // Bind texture
+    glBindTexture(GL_TEXTURE_2D, texture.id());
+
+    // Setup filtering parameters for display
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // Allocate memory on gpu
+    texture.resize(width, height);
+    texture.m_empty = false;
+
+    return texture;
+}
+
+Texture graphics::Texture::null() {
+    return Texture(0);
+}
+
+Texture::Texture(unsigned id)
+    : m_id(std::make_shared<ID>(0))
+{ }

@@ -175,7 +175,7 @@ void Shader::use() {
 	glUseProgram(m_id);
 	s_currentShaderID = id();
 
-	for (auto& [uniformName, uniformSource] : m_uniforms) {
+	for (auto& [uniformName, uniformSource] : *m_uniforms) {
 		uniformSource->set(*this, uniformName);
 	}
 }
@@ -228,6 +228,31 @@ void graphics::Shader::bindUniform(const std::string& name, std::weak_ptr<Camera
 
 unsigned int graphics::Shader::currentID() {
 	return s_currentShaderID;
+}
+
+Shader graphics::Shader::loadFromTextFiles(const char* vertexSourcePath, const char* fragmentSourcePath, const char* geometrySourcePath) {
+	std::ifstream vIfs(vertexSourcePath);
+	std::string vStr((std::istreambuf_iterator<char>(vIfs)), std::istreambuf_iterator<char>());
+	vIfs.close();
+
+	std::ifstream fIfs(fragmentSourcePath);
+	std::string fStr((std::istreambuf_iterator<char>(fIfs)), std::istreambuf_iterator<char>());
+	fIfs.close();
+	
+	auto vSource = new ShaderSourceWrapperImpl(vStr);
+	auto fSource = new ShaderSourceWrapperImpl(fStr);
+
+	if (geometrySourcePath != nullptr) {
+		std::ifstream gIfs(fragmentSourcePath);
+		std::string gStr((std::istreambuf_iterator<char>(fIfs)), std::istreambuf_iterator<char>());
+		gIfs.close();
+
+		auto gSource = new ShaderSourceWrapperImpl(gStr);
+
+		return Shader(*vSource, *fSource, *gSource);
+	}
+	
+	return Shader(*vSource, *fSource);
 }
 
 graphics::Shader::Shader() { }
@@ -296,11 +321,11 @@ void Shader::attachAndLinkShaders() {
 }
 
 void graphics::Shader::insertOrUpdatedUniform(const std::string& name, std::unique_ptr<IUniformSource>&& uniform) {
-	auto it = m_uniforms.find(name);
-	if (it == m_uniforms.end())
-		m_uniforms.insert({ name, std::move(uniform) });
+	auto it = m_uniforms->find(name);
+	if (it == m_uniforms->end())
+		m_uniforms->insert({ name, std::move(uniform) });
 	else
-		m_uniforms[name] = std::move(uniform);
+		(*m_uniforms)[name] = std::move(uniform);
 }
 
 inline bool Shader::IShaderSourceWrapper::compile() {

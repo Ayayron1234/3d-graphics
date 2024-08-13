@@ -105,7 +105,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)build;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)imgui\include;$(SolutionDir)graphics-engine\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
@@ -153,6 +153,7 @@ xcopy /y /s /i "$(SolutionDir)dependencies\DLLs\$(Configuration)" "$(TargetDir)"
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\viewport_demo.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\graphics-engine\graphics-engine.vcxproj">

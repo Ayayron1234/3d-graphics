@@ -22,7 +22,7 @@ void main()
 {
     gl_Position = vec4(vertex.xyz, 1.0) * M * VP;
 
-    Normal = normal * mat3(transpose(inverse(M)));
+    Normal = normalize(normal * mat3(transpose(inverse(M))));
     UV = vec2(uv.x, 1.f - uv.y);
 }
 )";
@@ -119,7 +119,11 @@ out vec4 FragColor;
 
 void main()
 {
-    float diffuse = .45 + dot(normalize(camPosition - Position), normalize(Normal)) / 3;
+    float camPosDot = dot(normalize(camPosition - Position), normalize(Normal));
+    if (camPosDot < 0)
+        camPosDot *= -1;
+
+    float diffuse = .45 + camPosDot / 3;
 
     //FragColor = vec4(Position.x - round(Position.x), Position.y - round(Position.y), Position.z - round(Position.z), 1.f);
     FragColor = vec4(diffuse, diffuse, diffuse, 1.f);
@@ -158,73 +162,41 @@ void main()
 static ShaderSourceWrapperImpl mattObjectShaderVertexSource = ShaderSourceWrapperImpl(g_mattObjectVertSource);
 static ShaderSourceWrapperImpl mattObjectShaderFragmentSource = ShaderSourceWrapperImpl(g_mattObjectFragSource);
 
-Shader Object::Shaders::matt = Shader(mattObjectShaderVertexSource, mattObjectShaderFragmentSource);
+Shader Object::DefaultShaders::matt = Shader(mattObjectShaderVertexSource, mattObjectShaderFragmentSource);
 
 static ShaderSourceWrapperImpl normalObjectShaderVertexSource = ShaderSourceWrapperImpl(g_normalObjectVertSource);
 static ShaderSourceWrapperImpl normalObjectShaderFragmentSource = ShaderSourceWrapperImpl(g_normalObjectFragSource);
 
-Shader Object::Shaders::normal = Shader(normalObjectShaderVertexSource, normalObjectShaderFragmentSource);
+Shader Object::DefaultShaders::normal = Shader(normalObjectShaderVertexSource, normalObjectShaderFragmentSource);
 
 static ShaderSourceWrapperImpl objectWireframeShaderVertexSource = ShaderSourceWrapperImpl(g_objectWireframeVertSource);
 static ShaderSourceWrapperImpl objectWireframeShaderFragmentSource = ShaderSourceWrapperImpl(g_objectWireframeFragSource);
 
-Shader Object::Shaders::wireframe = Shader(objectWireframeShaderVertexSource, objectWireframeShaderFragmentSource);
+Shader Object::DefaultShaders::wireframe = Shader(objectWireframeShaderVertexSource, objectWireframeShaderFragmentSource);
 
 static ShaderSourceWrapperImpl texturedObjectShaderVertexSource = ShaderSourceWrapperImpl(g_texturedObjectVertSource);
 static ShaderSourceWrapperImpl texturedObjectShaderFragmentSource = ShaderSourceWrapperImpl(g_texturedObjectFragSource);
 
-Shader Object::Shaders::textured = Shader(texturedObjectShaderVertexSource, texturedObjectShaderFragmentSource);
+Shader Object::DefaultShaders::textured = Shader(texturedObjectShaderVertexSource, texturedObjectShaderFragmentSource);
 
-Object::Object(std::shared_ptr<Mesh> mesh, std::shared_ptr<Texture> texture)
+Object::Object(std::shared_ptr<MeshBase> mesh, const Texture& texture)
 	: m_mesh(mesh)
 	, m_texture(texture)
 { }
 
 mat4 Object::getModelMatrix() const {
-	return mat4::scale(m_scale) * mat4::rotate(m_rotation) * mat4::translation(m_position);
+	return mat4::scale(scale) * mat4::rotate(rotation) * mat4::translation(position);
 }
 
 void Object::draw(Shader& shader) const {
     shader.setUniform("M", getModelMatrix());
-    if (m_texture)
-        shader.setUniform("tex2D", *m_texture.get());
+    if (!m_texture.empty())
+        shader.setUniform("tex2D", m_texture);
     m_mesh->draw(shader);
 }
 
-vec3 graphics::Object::getPosition() const {
-    return m_position;
-}
-
-void graphics::Object::setPosition(const vec3& position) {
-    m_position = position;
-}
-
-void graphics::Object::move(const vec3& direction) {
-    m_position = m_position + direction;
-}
-
-vec3 graphics::Object::getScale() const {
-    return m_scale;
-}
-
-void graphics::Object::setScale(const vec3& scale) {
-    m_scale = scale;
-}
-
-void graphics::Object::setRotation(const vec3& rotation) {
-    m_rotation = rotation;
-}
-
-void graphics::Object::tilt(const vec3& rotation) {
-    m_rotation = m_rotation + rotation;
-}
-
-void graphics::Object::tilt(float yaw, float pitch, float roll) {
-    tilt({ yaw, pitch, roll });
-}
-
-Mesh::BoundingBox graphics::Object::getBoundingBox() const {
-    Mesh::BoundingBox boundingBox;
+BoundingBox graphics::Object::getBoundingBox() const {
+    BoundingBox boundingBox;
     
     mat4 M = getModelMatrix();
 
@@ -261,24 +233,28 @@ void graphics::Object::drawBoundingBox() const {
     debug::drawLine(vertices[6], vertices[7]);
 }
 
-void Object::drawWireframe(const Color& color, Shader& shader) const {
-    shader.setUniform("M", getModelMatrix());
-    m_mesh->drawWireframe(color, shader);
+std::shared_ptr<MeshBase> graphics::Object::getMesh() const {
+    return m_mesh;
 }
 
+//void Object::drawWireframe(const Color& color, Shader& shader) const {
+//    shader.setUniform("M", getModelMatrix());
+//    m_mesh->drawWireframe(color, shader);
+//}
+
 Ray::Hit graphics::Object::intersectRay(const Ray& ray) const {
-    mat4 inverseTransform = mat4::inverseScale(m_scale) * mat4::inverseRotation(m_rotation);
+    mat4 inverseTransform = mat4::inverseScale(scale) * mat4::inverseRotation(rotation);
 
     Ray transformed = ray;
-    transformed.origin = vec4(ray.origin - m_position, 1.f) * inverseTransform;
+    transformed.origin = vec4(ray.origin - position, 1.f) * inverseTransform;
     transformed.direction = normalize(vec4(ray.direction, 0.f) * inverseTransform);
 
     Ray::Hit hit = m_mesh->intersectRay(transformed);
 
-    mat4 transform = mat4::scale(m_scale) * mat4::rotate(m_rotation);
-    hit.position = vec4(hit.position, 1.f) * transform + m_position;
+    mat4 transform = mat4::scale(scale) * mat4::rotate(rotation);
+    hit.position = vec4(hit.position, 1.f) * transform + position;
     hit.normal = normalize(vec4(hit.normal, 0.f) * transform);
-    hit.t = hit.t * m_scale.length();
+    hit.t = hit.t * scale.length();
 
     return hit;
 }

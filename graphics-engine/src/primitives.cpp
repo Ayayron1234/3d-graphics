@@ -5,6 +5,33 @@
 
 using namespace graphics;
 
+void BoundingBox::getVertices(vec3 vertices[8]) const {
+	vertices[0] = min;
+	vertices[1] = vec3(min.x, min.y, max.z);
+	vertices[2] = vec3(max.x, min.y, min.z);
+	vertices[3] = vec3(max.x, min.y, max.z);
+	vertices[4] = vec3(min.x, max.y, min.z);
+	vertices[5] = vec3(min.x, max.y, max.z);
+	vertices[6] = vec3(max.x, max.y, min.z);
+	vertices[7] = max;
+}
+
+void BoundingBox::update(const vec3& vertex) {
+	if (vertex.x < min.x)
+		min.x = vertex.x;
+	if (vertex.y < min.y)
+		min.y = vertex.y;
+	if (vertex.z < min.z)
+		min.z = vertex.z;
+
+	if (vertex.x > max.x)
+		max.x = vertex.x;
+	if (vertex.y > max.y)
+		max.y = vertex.y;
+	if (vertex.z > max.z)
+		max.z = vertex.z;
+}
+
 struct Vertex {
 	vec3			position;
 	Color::FColor   color;
@@ -20,7 +47,7 @@ struct Line {
 	Vertex v2;
 };
 
-struct Trig {
+struct ColorTrig {
 	Vertex v1;
 	Vertex v2;
 	Vertex v3;
@@ -46,6 +73,14 @@ void graphics::debug::drawLine(const vec3& v1, const vec3& v2, const Color& colo
 void debug::drawLine(
 	const vec2& v1, const Color& color1, 
 	const vec2& v2, const Color& color2, Shader& shader) 
+{
+	PrimitiveDrawer::useShader(shader);
+	PrimitiveDrawer::drawLine(v1, color1, v2, color2);
+}
+
+void debug::drawLine(
+	const vec3& v1, const Color& color1,
+	const vec3& v2, const Color& color2, Shader& shader)
 {
 	PrimitiveDrawer::useShader(shader);
 	PrimitiveDrawer::drawLine(v1, color1, v2, color2);
@@ -92,6 +127,15 @@ void debug::drawTrig(
 	PrimitiveDrawer::drawTrig(v1, color1, v2, color2, v3, color3);
 }
 
+void debug::drawTrig(
+	const vec3& v1, const Color& color1,
+	const vec3& v2, const Color& color2,
+	const vec3& v3, const Color& color3, Shader& shader)
+{
+	PrimitiveDrawer::useShader(shader);
+	PrimitiveDrawer::drawTrig(v1, color1, v2, color2, v3, color3);
+}
+
 void debug::fillTrig(
 	const vec2& v1, const Color& color1,
 	const vec2& v2, const Color& color2, 
@@ -126,6 +170,8 @@ PrimitiveDrawer::PrimitiveDrawer() {
 	glGenBuffers(1, &m_texturedTrigsVbo);
 	glBindBuffer(GL_ARRAY_BUFFER, m_texturedTrigsVbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(Trig) * s_maxTrigsCount, nullptr, GL_STATIC_DRAW);
+
+	colorShader.bindUniform("VP", debug::camera);
 }
 
 void PrimitiveDrawer::useShader(Shader& shader) {
@@ -133,7 +179,7 @@ void PrimitiveDrawer::useShader(Shader& shader) {
 	if (shader.id() && shader.id() == instance().m_currentShaderID && Shader::currentID() == instance().m_currentShaderID)
 		return;
 
-	shader.setUniform(*debug::camera);
+	//shader.setUniform(*debug::camera);
 	shader.use();
 
 	instance().m_currentShaderID = shader.id();
@@ -177,7 +223,7 @@ void PrimitiveDrawer::fillTrig(const vec3& v1, const Color::FColor color1, const
 	if (instance().m_trigsCount + 1 > s_maxTrigsCount)
 		instance().pushTrigs();
 
-	Trig trig = { v1, color1, v2, color2, v3, color3 };
+	ColorTrig trig = { v1, color1, v2, color2, v3, color3};
 
 	glBindVertexArray(instance().m_vao);
 	glBindBuffer(GL_ARRAY_BUFFER, instance().m_trigsVbo);

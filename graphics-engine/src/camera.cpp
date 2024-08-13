@@ -51,6 +51,12 @@ void Camera::setAspectRatio(const Window& window) {
 	m_updated = true;
 }
 
+void graphics::Camera::setAspectRatio(const Viewport& viewport) {
+	vec2 size = viewport.size();
+	m_asp = size.x / size.y;
+	m_updated = true;
+}
+
 void graphics::Camera::setFoV(float fov) {
 	m_fov = fov;
 	m_updated = true;

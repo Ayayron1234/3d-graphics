@@ -22,6 +22,8 @@ bool keyReleased(Key key);
 
 bool isModPressed(KeyMod mod);
 
+uint8_t getMods();
+
 enum class Key : uint8_t {
     A = 4,
     B = 5,
